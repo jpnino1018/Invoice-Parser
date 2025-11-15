@@ -237,6 +237,37 @@ def parse_invoice_xml(raw_xml: bytes | str) -> dict:
             "total_linea": (line_total or "").strip() if line_total else ""
         })
 
+    # Extraer IVA total
+    tax_total = _find_key(invoice, ["TaxTotal", "cac:TaxTotal"])
+    iva_total = 0
+    if tax_total:
+        if isinstance(tax_total, list):
+            for tt in tax_total:
+                iva_val = get_text(tt, ["TaxAmount", "cbc:TaxAmount"])
+                if iva_val:
+                    try:
+                        iva_total += float(iva_val)
+                    except:
+                        pass
+        else:
+            iva_val = get_text(tax_total, ["TaxAmount", "cbc:TaxAmount"])
+            if iva_val:
+                try:
+                    iva_total = float(iva_val)
+                except:
+                    pass
+    
+    # Extraer ciudad del cliente
+    ciudad = None
+    if customer_block:
+        party = _find_key(customer_block, ["Party", "cac:Party"])
+        if party:
+            location = _find_key(party, ["PhysicalLocation", "cac:PhysicalLocation"])
+            if location:
+                address = _find_key(location, ["Address", "cac:Address"])
+                if address:
+                    ciudad = get_text(address, ["CityName", "cbc:CityName"])
+
     return {
         "numero": str(numero) if numero else None,
         "uuid": str(uuid) if uuid else None,
@@ -246,5 +277,7 @@ def parse_invoice_xml(raw_xml: bytes | str) -> dict:
         "cliente": {"name": (customer_name or "").strip(), "nit": (customer_nit or "").strip()},
         "total": (payable or "").strip() if payable else None,
         "currency": (currency or "").strip() if currency else None,
+        "iva": str(iva_total),
+        "ciudad": (ciudad or "").strip() if ciudad else "",
         "items": parsed_items
     }
